@@ -5,10 +5,11 @@ import pykitti
 import yaml
 import numpy as np
 from tqdm import tqdm
+import os
 
-raw_kitti_base_path = Path('/usr/src/research/raw_data_downloader')
-raw_kitti_config_path = Path('/usr/src/research/lidar-bonnetal/train/tasks/semantic/config/labels/raw-kitti.yaml')
-
+raw_kitti_base_path = Path('/home/fusionresearch/Datasets/KITTI_raw_dataset')
+raw_kitti_config_path = Path('/home/fusionresearch/AliThesis/lidar-bonnetal/train/tasks/semantic/config/labels/raw-kitti.yaml')
+log_file = raw_kitti_base_path / "bounding_box_labels_skipped_frames.txt"
 
 def load_tracklet(tracklet_labels_file_path):
     """
@@ -115,7 +116,12 @@ def get_points_labels(point_cloud, bouding_boxes, bouding_boxes_labels):
     return point_cloud_labels
 
 if __name__ == '__main__':
-    
+        ## If file exists, delete it ##
+    if os.path.isfile(str(log_file)):
+        os.remove(str(log_file))
+    else:    ## Show an error ##
+        print("Error: %s log file not found" % log_file)
+
     try:
         print("Opening data config file %s" % raw_kitti_config_path)
         data_config = yaml.safe_load(open(raw_kitti_config_path, 'r'))
@@ -129,23 +135,30 @@ if __name__ == '__main__':
 
     for date in dates:
         date_path = raw_kitti_base_path / date
-        drives = [i.name for i in date_path.glob('*') if i.is_dir()]
+        drives = sorted([i.name for i in date_path.glob('*') if i.is_dir()])
         for drive in drives:
             drive_number = drive.split('_')[-2]
             data = pykitti.raw(str(raw_kitti_base_path), date, drive_number)
-            print(len(data))
+            
             tracklet_labels_file_path = raw_kitti_base_path/ date / drive  / "tracklet_labels.xml"
-
-            output_path = raw_kitti_base_path/ date / drive / "BoudingBoxLabels"
+            output_path = raw_kitti_base_path/ date / drive / "BoundingBoxLabels"
             output_path.mkdir(parents=True, exist_ok=True)
-            bouding_boxes, bounding_boxes_labels = load_tracklet(tracklet_labels_file_path)
-            for frame_idx in tqdm(range(len(data)), f"{drive}"):
-                point_cloud = data.get_velo(frame_idx)
-                frame_bouding_boxes = bouding_boxes[frame_idx]
-                frame_bouding_boxes_labels = bounding_boxes_labels[frame_idx]
-                frame_bouding_boxes_labels_num = [data_config["labels_inv"][i] for i in frame_bouding_boxes_labels]
-                point_cloud_labels = get_points_labels(point_cloud, frame_bouding_boxes, frame_bouding_boxes_labels_num)
+            
+            bounding_boxes, bounding_boxes_labels = load_tracklet(tracklet_labels_file_path)
+            for file_name, point_cloud in tqdm(zip(data.velo_files, data.velo), f"{drive}", total=len(data.velo_files)):
+                frame_idx = int(Path(file_name).stem)
+                
+                if frame_idx not in bounding_boxes:
+                    print(f"not bounding boxes found for frame {frame_idx}")
+                    with open(str(log_file), 'a') as lg:
+                        lg.write(f"{drive} frame: {frame_idx} \n")
+                    continue
+                frame_bounding_boxes = bounding_boxes[frame_idx]
+                frame_bounding_boxes_labels = bounding_boxes_labels[frame_idx]
+                frame_bounding_boxes_labels_num = [data_config["labels_inv"][i] for i in frame_bounding_boxes_labels]
+                point_cloud_labels = get_points_labels(point_cloud, frame_bounding_boxes, frame_bounding_boxes_labels_num)
                 point_cloud_labels = point_cloud_labels.astype(np.int32)
-                label_file_name = "{:010d}".format(frame_idx)
-                np.save(output_path/label_file_name, point_cloud_labels)
+
+                label_file_name = "{:010d}.label".format(frame_idx)
+                point_cloud_labels.tofile(str(output_path/label_file_name))
 # print(load_tracklet(tracklet_labels_file_path))
