@@ -10,7 +10,7 @@ import re
 import cv2
 import torch
 from tqdm import tqdm
-
+import shutil
 MIN_W_ANGLE = np.deg2rad(-40)
 MAX_W_ANGLE = np.deg2rad(40)
 MAX_POINTS = 150000
@@ -18,6 +18,7 @@ MAX_POINTS = 150000
 class LaserScan:
   """Class that contains LaserScan with x,y,z,r"""
   EXTENSIONS_SCAN = ['.bin']
+  EXTENSIONS_LABEL = ['.label', '.npy', '.png']
 
   def __init__(self, project=False, H=64, W=1024, fov_up=3.0, fov_down=-25.0, calib_params=None, image_width=1241, image_height=376):
     self.project = project
@@ -97,7 +98,9 @@ class LaserScan:
     # put in attribute
     points = scan[:, 0:3]    # get xyz
     remissions = scan[:, 3]  # get remission
-    image = Image.open(imagename)
+    #image = Image.open(imagename)
+    image = cv2.imread(imagename)
+    image = cv2.cvtColor(image,cv2.COLOR_BGR2RGB)
     self.set_points(points, remissions, image)
 
   def set_points(self, points, remissions=None, image=None):
@@ -121,7 +124,7 @@ class LaserScan:
     else:
       self.remissions = np.zeros((points.shape[0]), dtype=np.float32)
 
-    if image:
+    if image is not None:
       self.image = image
 
     # if projection is wanted, then do it and fill in the structure
@@ -165,8 +168,8 @@ class LaserScan:
       x, y = np.floor(image_coordinates[idx, :]).astype(np.int64)
         
       # set rgb value according to image
-      result[idx, :] = np.array(image.getpixel((int(x),int(y)))).astype(np.float32) # CHANGED FROM float64
-
+      # result[idx, :] = np.array(image.getpixel((int(x),int(y)))).astype(np.float32) # CHANGED FROM float64
+      result[idx, :] = np.array(image[x, y]).astype(np.float32) 
     return result
 
   def do_range_projection(self):
@@ -259,15 +262,39 @@ class LaserScan:
     self.proj_mask = (self.proj_idx > 0).astype(np.int32) # CHANGED FROM float32.
     self.proj_rgb[proj_y, proj_x] = rgb
 
+  def open_label(self, filename, filter=True):
+    """ Open raw scan and fill in attributes
+    """
+    # check filename is string
+    if not isinstance(filename, str):
+      raise TypeError("Filename should be string type, "
+                      "but was {type}".format(type=str(type(filename))))
+
+    # check extension is a laserscan
+    if not any(filename.endswith(ext) for ext in self.EXTENSIONS_LABEL):
+      raise RuntimeError("Filename extension is not valid label file.")
+
+    # if all goes well, open label
+    label = np.fromfile(filename, dtype=np.int32)
+    label = label.reshape((-1))
+
+    if(filter):
+      self.label = label[self.image_filter_condition]
+
 EXTENSIONS_SCAN = ['.bin']
 EXTENSIONS_IMAGE = ['.png']
-
+EXTENSIONS_LABEL = ['.label', '.npy', '.png']
 
 def is_scan(filename):
   return any(filename.endswith(ext) for ext in EXTENSIONS_SCAN)
 
 def is_image(filename):
   return any(filename.endswith(ext) for ext in EXTENSIONS_IMAGE)
+
+
+def is_label(filename):
+    return any(filename.endswith(ext) for ext in EXTENSIONS_LABEL)
+
 
 if __name__== "__main__":
     parser = argparse.ArgumentParser("./normalization.py")
@@ -290,6 +317,26 @@ if __name__== "__main__":
         required=True,
         help='Architecture yaml cfg file. See /config/arch for sample. No default!',
     )
+    parser.add_argument(
+        '--save_proj',
+        type=str,
+        required=False,
+        help='should save projected points',
+    )
+    parser.add_argument(
+        '--save_projected',
+        type=bool,
+        required=False,
+        default=False,
+        help='should save projected points',
+    )
+    parser.add_argument(
+        '--save_projected_dir',
+        type=str,
+        required=False,
+        default=".",
+        help='directory to save projected points in',
+    )
     FLAGS, unparsed = parser.parse_known_args()
 
     # open data config file
@@ -311,6 +358,12 @@ if __name__== "__main__":
         quit()
 
     root = os.path.join(FLAGS.dataset, "sequences")
+    print(FLAGS)
+    if FLAGS.save_projected:
+      save_root = os.path.join(FLAGS.save_projected_dir, "sequences")
+      if not os.path.isdir(save_root):
+        os.makedirs(save_root, exist_ok=True)
+
     train_sequences=DATA["split"]["train"]
     valid_sequences=DATA["split"]["valid"]
     sequences = train_sequences
@@ -345,13 +398,24 @@ if __name__== "__main__":
         # get paths for each
         scan_path = os.path.join(root, seq, "velodyne")
         image_path = os.path.join(root, seq, "image_2")
-
+        label_path = os.path.join(root, seq, "labels")
+        if FLAGS.save_projected:
+          save_scan_path = os.path.join(save_root, seq, "velodyne")
+          save_image_path = os.path.join(save_root, seq, "image_2")
+          save_label_path = os.path.join(save_root, seq, "labels")
+          if not os.path.isdir(save_scan_path):
+            os.makedirs(save_scan_path, exist_ok=True)
+          if not os.path.isdir(save_image_path):
+            os.makedirs(save_image_path, exist_ok=True)
+          if not os.path.isdir(save_label_path):
+            os.makedirs(save_label_path, exist_ok=True)
         # get files
         scan_files = [os.path.join(dp, f) for dp, dn, fn in os.walk(
             os.path.expanduser(scan_path)) for f in fn if is_scan(f)]
         image_files = [os.path.join(dp, f) for dp, dn, fn in os.walk(
             os.path.expanduser(image_path)) for f in fn if is_image(f)]
-
+        label_files = [os.path.join(dp, f) for dp, dn, fn in os.walk(
+                os.path.expanduser(label_path)) for f in fn if is_label(f)]
         assert(len(scan_files) == len(image_files))
 
         # extend list
@@ -361,9 +425,11 @@ if __name__== "__main__":
         # sort for correspondance
         scan_files.sort()
         image_files.sort()
+        label_files.sort()
 
-        for scan_file, image_file in tqdm(list(zip(scan_files, image_files)), "processing seq {}".format(seq)):
-            image_size = Image.open(image_file).size
+        for scan_file, image_file, label_file in tqdm(list(zip(scan_files, image_files, label_files)), "processing seq {}".format(seq)):
+            # image_size = Image.open(image_file).size
+            image_size = cv2.imread(image_file).shape
             scan = LaserScan(project=True,
                     H=sensor_img_H,
                     W=sensor_img_W,
@@ -374,8 +440,32 @@ if __name__== "__main__":
                     image_width=image_size[0])
             
             scan.open_scan(scan_file, image_file)
+            scan.open_label(label_file)
             #cv2.imwrite("pgm.png", scan.proj_rgb.astype(np.uint8))
-            
+
+            ############# save projected ##################################
+            if FLAGS.save_projected:
+              def path_split(p):
+                norm = os.path.normpath(p)
+                split = norm.split(os.sep)
+                return split
+              save_scan_file = os.path.join(save_scan_path, path_split(scan_file)[-1] )
+              save_image_file = os.path.join(save_image_path, path_split(image_file)[-1])
+              save_label_file = os.path.join(save_label_path, path_split(label_file)[-1])
+              # x,y,z,remission,range,r,g,b
+              #save_scan = np.stack([scan.points, scan.remissions, scan.depth, scan.rgb], axis=0)
+              save_scan = np.concatenate([scan.points, scan.remissions.reshape(-1,1), scan.depth.reshape(-1,1), scan.rgb], axis=1)
+              save_scan = save_scan.astype(np.float32)
+              save_label = scan.label.astype(np.int32)
+              assert save_scan.shape[0] == scan.points.shape[0]
+              assert save_scan.shape[0] == scan.label.shape[0]
+
+              save_scan.tofile(save_scan_file)
+              save_label.tofile(save_label_file)
+              shutil.copyfile(image_file, save_image_file)
+            ############# save projected ##################################
+
+              
             # make a tensor of the uncompressed data (with the max num points)
             unproj_n_points = scan.points.shape[0]
     
@@ -401,8 +491,11 @@ if __name__== "__main__":
     stacked_pgms = torch.stack(all_pgm)
     print("Stacked Size: ", stacked_pgms.size())
 
-    means = torch.mean(stacked_pgms, dim=[0,2,3])
-    stds = torch.std(stacked_pgms, dim=[0,2,3])
-
+    means = torch.mean(stacked_pgms, dim=[0,2,3]).cpu().detach().numpy()
+    stds = torch.std(stacked_pgms, dim=[0,2,3]).cpu().detach().numpy()
     print("Means: ", means)
     print("Stds: ", stds)
+    np.savetxt("means.csv", means, delimiter=",")
+    np.savetxt("stds.csv", stds, delimiter=",")
+    # print("Means: ", means)
+    # print("Stds: ", stds)
