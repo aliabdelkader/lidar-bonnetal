@@ -11,6 +11,7 @@ import shutil
 import __init__ as booger
 
 from tasks.semantic.modules.trainer import *
+from tasks.semantic.modules.CVtrainer import *
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser("./train.py")
@@ -46,6 +47,20 @@ if __name__ == '__main__':
       required=False,
       default=None,
       help='Directory to get the pretrained model. If not passed, do from scratch!'
+  )
+  parser.add_argument(
+      '--use_cross_validation',
+      type=bool,
+      required=False,
+      default=None,
+      help='Use cross validation'
+  )
+  parser.add_argument(
+      '--num_cross_folds',
+      type=int,
+      required=False,
+      default=None,
+      help='number of folds to use'
   )
   FLAGS, unparsed = parser.parse_known_args()
 
@@ -109,7 +124,9 @@ if __name__ == '__main__':
     print(e)
     print("Error copying files, check permissions. Exiting...")
     quit()
-
-  # create trainer and start the training
-  trainer = Trainer(ARCH, DATA, FLAGS.dataset, FLAGS.log, FLAGS.pretrained)
+  
+  if FLAGS.use_cross_validation:
+    trainer = CVTrainer(ARCH, DATA, FLAGS.dataset, FLAGS.log, path=FLAGS.pretrained, num_cross_folds=FLAGS.num_cross_folds)
+  else:
+    trainer = Trainer(ARCH, DATA, FLAGS.dataset, FLAGS.log, FLAGS.pretrained)
   trainer.train()
