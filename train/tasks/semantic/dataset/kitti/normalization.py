@@ -488,16 +488,16 @@ if __name__== "__main__":
           save_scan = np.concatenate([scan.points, scan.remissions.reshape(-1,1), scan.depth.reshape(-1,1), scan.rgb], axis=1)
           save_scan = save_scan.astype(np.float32)
           assert save_scan.shape[0] == scan.points.shape[0]
-          save_scan.tofile(save_scan_file)
-          # np.save(save_scan_file, save_scan)
+          # save_scan.tofile(save_scan_file)
+          np.save(save_scan_file.replace(".bin", ""), save_scan)
           shutil.copyfile(image_file, save_image_file)
 
           if scan.label is not None:
             save_label_file = os.path.join(save_label_path, path_split(label_file)[-1])
             save_label = scan.label.astype(np.int32)
             assert save_scan.shape[0] == scan.label.shape[0]
-            save_label.tofile(save_label_file)
-            # np.save(save_label_file, save_label)
+            # save_label.tofile(save_label_file)
+            np.save(save_label_file.replace(".label", ""), save_label)
 
         def get_pgm(scan: LaserScan):    
           """
