@@ -416,19 +416,19 @@ class CVTrainer():
 
             # get gradient updates and weights, so I can print the relationship of
             # their norms
-            update_ratios = []
-            for g in optimizer.param_groups:
-                lr = g["lr"]
-                for value in g["params"]:
-                    if value.grad is not None:
-                        w = np.linalg.norm(value.data.cpu().numpy().reshape((-1)))
-                        update = np.linalg.norm(-max(lr, 1e-10) *
-                                                value.grad.cpu().numpy().reshape((-1)))
-                        update_ratios.append(update / max(w, 1e-10))
-            update_ratios = np.array(update_ratios)
-            update_mean = update_ratios.mean()
-            update_std = update_ratios.std()
-            update_ratio_meter.update(update_mean)  # over the epoch
+            # update_ratios = []
+            # for g in optimizer.param_groups:
+            #     lr = g["lr"]
+            #     for value in g["params"]:
+            #         if value.grad is not None:
+            #             w = np.linalg.norm(value.data.cpu().numpy().reshape((-1)))
+            #             update = np.linalg.norm(-max(lr, 1e-10) *
+            #                                     value.grad.cpu().numpy().reshape((-1)))
+            #             update_ratios.append(update / max(w, 1e-10))
+            # update_ratios = np.array(update_ratios)
+            # update_mean = update_ratios.mean()
+            # update_std = update_ratios.std()
+            # update_ratio_meter.update(update_mean)  # over the epoch
 
             if show_scans:
                 # get the first scan in batch and project points
@@ -441,8 +441,18 @@ class CVTrainer():
                 cv2.waitKey(1)
 
             if i % self.ARCH["train"]["report_batch"] == 0:
-                print('Lr: {lr:.3e} | '
-                    'Update: {umean:.3e} mean,{ustd:.3e} std | '
+                # print('Lr: {lr:.3e} | '
+                #     'Update: {umean:.3e} mean,{ustd:.3e} std | '
+                #     'Epoch: [{0}][{1}/{2}] | '
+                #     'Time {batch_time.val:.3f} ({batch_time.avg:.3f}) | '
+                #     'Data {data_time.val:.3f} ({data_time.avg:.3f}) | '
+                #     'Loss {loss.val:.4f} ({loss.avg:.4f}) | '
+                #     'acc {acc.val:.3f} ({acc.avg:.3f}) | '
+                #     'IoU {iou.val:.3f} ({iou.avg:.3f})'.format(
+                #         epoch, i, len(train_loader), batch_time=batch_time,
+                #         data_time=data_time, loss=losses, acc=acc, iou=iou, lr=lr,
+                #         umean=update_mean, ustd=update_std))
+                print(
                     'Epoch: [{0}][{1}/{2}] | '
                     'Time {batch_time.val:.3f} ({batch_time.avg:.3f}) | '
                     'Data {data_time.val:.3f} ({data_time.avg:.3f}) | '
@@ -450,8 +460,8 @@ class CVTrainer():
                     'acc {acc.val:.3f} ({acc.avg:.3f}) | '
                     'IoU {iou.val:.3f} ({iou.avg:.3f})'.format(
                         epoch, i, len(train_loader), batch_time=batch_time,
-                        data_time=data_time, loss=losses, acc=acc, iou=iou, lr=lr,
-                        umean=update_mean, ustd=update_std))
+                        data_time=data_time, loss=losses, acc=acc, iou=iou,
+                        ))
 
             # step scheduler
             scheduler.step()
