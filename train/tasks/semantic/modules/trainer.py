@@ -35,6 +35,15 @@ class Trainer():
     self.log = logdir
     self.path = path
 
+    self.seed = None
+    if self.ARCH["train"].get("initialize_seed", False):
+        self.seed = self.ARCH["train"]["seed"]
+        print("using seed {}".format(self.seed))
+        torch.manual_seed(seed=self.seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+        np.random.seed(seed=self.seed)
+
     # put logger where it belongs
     self.tb_logger = Logger(self.log + "/tb")
     self.info = {"train_update": 0,
@@ -96,8 +105,12 @@ class Trainer():
     self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Training in device: ", self.device)
     if torch.cuda.is_available() and torch.cuda.device_count() > 0:
-      cudnn.benchmark = True
-      cudnn.fastest = True
+      if self.ARCH["train"].get("initialize_seed", False):
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+      else:
+        cudnn.benchmark = True
+        cudnn.fastest = True
       self.gpu = True
       self.n_gpus = 1
       self.model.cuda()
