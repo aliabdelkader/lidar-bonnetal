@@ -78,6 +78,7 @@ class LaserScan:
     else:
       scan = np.fromfile(filename, dtype=np.float32)
       scan = scan.reshape((-1, 4))
+   
 
     # put in attribute
     points = scan[:, 0:3]    # get xyz
@@ -244,9 +245,12 @@ class SemLaserScan(LaserScan):
     if not any(filename.endswith(ext) for ext in self.EXTENSIONS_LABEL):
       raise RuntimeError("Filename extension is not valid label file.")
 
-    # if all goes well, open label
-    label = np.fromfile(filename, dtype=np.int32)
-    label = label.reshape((-1))
+    if '.npy' in filename:
+      label = np.load(filename)
+    else:
+      # if all goes well, open label
+      label = np.fromfile(filename, dtype=np.int32)
+      label = label.reshape((-1))
 
     # set it
     self.set_label(label)

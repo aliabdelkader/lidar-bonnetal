@@ -37,8 +37,8 @@ class SemanticKitti(Dataset):
     self.sensor = sensor
     self.sensor_img_H = sensor["img_prop"]["height"]
     self.sensor_img_W = sensor["img_prop"]["width"]
-    self.sensor_min_w_angle = sensor.get("min_w_angle_degree", None)
-    self.sensor_max_w_angle = sensor.get("max_w_angle_degree", None)
+    self.sensor_min_w_angle_degree = sensor.get("min_w_angle_degree", None)
+    self.sensor_max_w_angle_degree = sensor.get("max_w_angle_degree", None)
     self.sensor_img_means = torch.tensor(sensor["img_means"],
                                          dtype=torch.float)
     self.sensor_img_stds = torch.tensor(sensor["img_stds"],
@@ -114,7 +114,7 @@ class SemanticKitti(Dataset):
     scan_file = self.scan_files[index]
     if self.gt:
       label_file = self.label_files[index]
-
+    
     # open a semantic laserscan
     if self.gt:
       scan = SemLaserScan(self.color_map,
@@ -123,16 +123,16 @@ class SemanticKitti(Dataset):
                           W=self.sensor_img_W,
                           fov_up=self.sensor_fov_up,
                           fov_down=self.sensor_fov_down,
-                          min_w_angle=self.sensor_min_w_angle,
-                          max_w_angle=self.sensor_max_w_angle)
+                          min_w_angle_degree=self.sensor_min_w_angle_degree,
+                          max_w_angle_degree=self.sensor_max_w_angle_degree)
     else:
       scan = LaserScan(project=True,
                        H=self.sensor_img_H,
                        W=self.sensor_img_W,
                        fov_up=self.sensor_fov_up,
                        fov_down=self.sensor_fov_down,
-                       min_w_angle=self.sensor_min_w_angle,
-                       max_w_angle=self.sensor_max_w_angle)
+                       min_w_angle_degree=self.sensor_min_w_angle_degree,
+                       max_w_angle_degree=self.sensor_max_w_angle_degree)
 
     # open and obtain scan
     scan.open_scan(scan_file)
