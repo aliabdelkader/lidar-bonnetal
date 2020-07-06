@@ -5,14 +5,16 @@ import numpy as np
 
 class LaserScan:
   """Class that contains LaserScan with x,y,z,r"""
-  EXTENSIONS_SCAN = ['.bin']
+  EXTENSIONS_SCAN = ['.bin', '.npy']
 
-  def __init__(self, project=False, H=64, W=1024, fov_up=3.0, fov_down=-25.0):
+  def __init__(self, project=False, H=64, W=1024, fov_up=3.0, fov_down=-25.0, min_w_angle_degree=0, max_w_angle_degree=180):
     self.project = project
     self.proj_H = H
     self.proj_W = W
     self.proj_fov_up = fov_up
     self.proj_fov_down = fov_down
+    self.min_w_angle_degree = min_w_angle_degree
+    self.max_w_angle_degree = max_w_angle_degree
     self.reset()
 
   def reset(self):
@@ -71,8 +73,11 @@ class LaserScan:
       raise RuntimeError("Filename extension is not valid scan file.")
 
     # if all goes well, open pointcloud
-    scan = np.fromfile(filename, dtype=np.float32)
-    scan = scan.reshape((-1, 4))
+    if '.npy' in filename:
+      scan = np.load(filename)
+    else:
+      scan = np.fromfile(filename, dtype=np.float32)
+      scan = scan.reshape((-1, 4))
 
     # put in attribute
     points = scan[:, 0:3]    # get xyz
@@ -110,6 +115,8 @@ class LaserScan:
         if the value of the constructor was not set (in case you change your
         mind about wanting the projection)
     """
+    self.min_w_angle = np.deg2rad(self.min_w_angle_degree)
+    self.max_w_angle = np.deg2rad(self.max_w_angle_degree)
     # laser parameters
     fov_up = self.proj_fov_up / 180.0 * np.pi      # field of view up in rad
     fov_down = self.proj_fov_down / 180.0 * np.pi  # field of view down in rad
@@ -128,9 +135,8 @@ class LaserScan:
     pitch = np.arcsin(scan_z / depth)
 
     # get projections in image coords
-    proj_x = 0.5 * (yaw / np.pi + 1.0)          # in [0.0, 1.0]
-    proj_y = 1.0 - (pitch + abs(fov_down)) / fov        # in [0.0, 1.0]
-
+    proj_x = (yaw - self.min_w_angle) / (self.max_w_angle - self.min_w_angle) # in [0.0, 1.0]
+    proj_y = 1.0 - (pitch + abs(fov_down)) / fov    
     # scale to image size using angular resolution
     proj_x *= self.proj_W                              # in [0.0, W]
     proj_y *= self.proj_H                              # in [0.0, H]
@@ -169,10 +175,10 @@ class LaserScan:
 
 class SemLaserScan(LaserScan):
   """Class that contains LaserScan with x,y,z,r,sem_label,sem_color_label,inst_label,inst_color_label"""
-  EXTENSIONS_LABEL = ['.label']
+  EXTENSIONS_LABEL = ['.label', '.npy']
 
-  def __init__(self,  sem_color_dict=None, project=False, H=64, W=1024, fov_up=3.0, fov_down=-25.0, max_classes=300):
-    super(SemLaserScan, self).__init__(project, H, W, fov_up, fov_down)
+  def __init__(self,  sem_color_dict=None, project=False, H=64, W=1024, fov_up=3.0, fov_down=-25.0, max_classes=300, min_w_angle_degree=0, max_w_angle_degree=180):
+    super(SemLaserScan, self).__init__(project, H, W, fov_up, fov_down, min_w_angle_degree=min_w_angle_degree, max_w_angle_degree=max_w_angle_degree)
     self.reset()
 
     # make semantic colors
