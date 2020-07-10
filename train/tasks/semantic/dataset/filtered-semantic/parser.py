@@ -26,7 +26,8 @@ class SemanticKitti(Dataset):
                learning_map_inv,    # inverse of previous (recover labels)
                sensor,              # sensor to parse scans from
                max_points=150000,   # max number of points present in dataset
-               gt=True):            # send ground truth?
+               gt=True,           # send ground truth?
+               use_rgb_channels=False):
     # save deats
     self.root = os.path.join(root, "sequences")
     self.sequences = sequences
@@ -47,6 +48,7 @@ class SemanticKitti(Dataset):
     self.sensor_fov_down = sensor["fov_down"]
     self.max_points = max_points
     self.gt = gt
+    self.use_rgb_channels = use_rgb_channels
 
     # get number of classes (can't be len(self.learning_map) because there
     # are multiple repeated entries, so the number that matters is how many
@@ -124,7 +126,8 @@ class SemanticKitti(Dataset):
                           fov_up=self.sensor_fov_up,
                           fov_down=self.sensor_fov_down,
                           min_w_angle_degree=self.sensor_min_w_angle_degree,
-                          max_w_angle_degree=self.sensor_max_w_angle_degree)
+                          max_w_angle_degree=self.sensor_max_w_angle_degree,
+                          use_rgb=self.use_rgb_channels)
     else:
       scan = LaserScan(project=True,
                        H=self.sensor_img_H,
@@ -132,7 +135,8 @@ class SemanticKitti(Dataset):
                        fov_up=self.sensor_fov_up,
                        fov_down=self.sensor_fov_down,
                        min_w_angle_degree=self.sensor_min_w_angle_degree,
-                       max_w_angle_degree=self.sensor_max_w_angle_degree)
+                       max_w_angle_degree=self.sensor_max_w_angle_degree,
+                       use_rgb=self.use_rgb_channels)
 
     # open and obtain scan
     scan.open_scan(scan_file)
@@ -150,6 +154,10 @@ class SemanticKitti(Dataset):
     unproj_range[:unproj_n_points] = torch.from_numpy(scan.unproj_range)
     unproj_remissions = torch.full([self.max_points], -1.0, dtype=torch.float)
     unproj_remissions[:unproj_n_points] = torch.from_numpy(scan.remissions)
+    if self.use_rgb_channels:
+      unproj_rgb = torch.full((self.max_points, 3), -1.0, dtype=torch.float)
+      unproj_rgb[:unproj_n_points] = torch.from_numpy(scan.rgb)
+
     if self.gt:
       unproj_labels = torch.full([self.max_points], -1.0, dtype=torch.int32)
       unproj_labels[:unproj_n_points] = torch.from_numpy(scan.sem_label)
@@ -161,6 +169,8 @@ class SemanticKitti(Dataset):
     proj_xyz = torch.from_numpy(scan.proj_xyz).clone()
     proj_remission = torch.from_numpy(scan.proj_remission).clone()
     proj_mask = torch.from_numpy(scan.proj_mask)
+    if self.use_rgb_channels:
+      proj_rgb = torch.from_numpy(scan.proj_rgb).clone()
     if self.gt:
       proj_labels = torch.from_numpy(scan.proj_sem_label).clone()
       proj_labels = proj_labels * proj_mask
@@ -170,9 +180,17 @@ class SemanticKitti(Dataset):
     proj_x[:unproj_n_points] = torch.from_numpy(scan.proj_x)
     proj_y = torch.full([self.max_points], -1, dtype=torch.long)
     proj_y[:unproj_n_points] = torch.from_numpy(scan.proj_y)
-    proj = torch.cat([proj_range.unsqueeze(0).clone(),
-                      proj_xyz.clone().permute(2, 0, 1),
-                      proj_remission.unsqueeze(0).clone()])
+    
+    if self.use_rgb_channels:
+      proj = torch.cat([proj_range.unsqueeze(0).clone(),
+                        proj_xyz.clone().permute(2, 0, 1),
+                        proj_remission.unsqueeze(0).clone(),
+                        proj_rgb.clone().permute(2, 0, 1)])
+    else:
+      proj = torch.cat([proj_range.unsqueeze(0).clone(),
+                        proj_xyz.clone().permute(2, 0, 1),
+                        proj_remission.unsqueeze(0).clone()])
+    
     proj = (proj - self.sensor_img_means[:, None, None]
             ) / self.sensor_img_stds[:, None, None]
     proj = proj * proj_mask.float()
@@ -187,7 +205,27 @@ class SemanticKitti(Dataset):
     # print("path_name", path_name)
 
     # return
-    return proj, proj_mask, proj_labels, unproj_labels, path_seq, path_name, proj_x, proj_y, proj_range, unproj_range, proj_xyz, unproj_xyz, proj_remission, unproj_remissions, unproj_n_points
+    item = {}
+    item['proj'] = proj
+    item['proj_mask'] = proj_mask
+    item['proj_labels'] = proj_labels
+    item['unproj_labels'] = unproj_labels
+    item['path_seq'] = path_seq
+    item['path_name'] = path_name
+    item['proj_x'] = proj_x
+    item['proj_y'] = proj_y
+    item['proj_range'] = proj_range
+    item['unproj_range'] = unproj_range
+    item['proj_xyz'] = proj_xyz
+    item['unproj_xyz'] = unproj_xyz
+    item['proj_remission'] = proj_remission
+    item['unproj_remissions'] = unproj_remissions
+    item['unproj_n_points'] = unproj_n_points
+    if self.use_rgb_channels:
+      item['proj_rgb'] = proj_rgb
+      item['unproj_rgb'] = unproj_rgb
+
+    return item
 
   def __len__(self):
     return len(self.scan_files)
@@ -235,7 +273,8 @@ class Parser():
                batch_size,        # batch size for train and val
                workers,           # threads to load data
                gt=True,           # get gt?
-               shuffle_train=True):  # shuffle training set?
+               shuffle_train=True,  # shuffle training set?
+               use_rgb_channels=False):
     super(Parser, self).__init__()
 
     # if I am training, get the dataset
@@ -253,6 +292,7 @@ class Parser():
     self.workers = workers
     self.gt = gt
     self.shuffle_train = shuffle_train
+    self.use_rgb_channels = use_rgb_channels
 
     # number of classes that matters is the one for xentropy
     self.nclasses = len(self.learning_map_inv)
@@ -266,7 +306,8 @@ class Parser():
                                        learning_map_inv=self.learning_map_inv,
                                        sensor=self.sensor,
                                        max_points=max_points,
-                                       gt=self.gt)
+                                       gt=self.gt,
+                                       use_rgb_channels=self.use_rgb_channels)
 
     self.trainloader = torch.utils.data.DataLoader(self.train_dataset,
                                                    batch_size=self.batch_size,
@@ -285,7 +326,8 @@ class Parser():
                                        learning_map_inv=self.learning_map_inv,
                                        sensor=self.sensor,
                                        max_points=max_points,
-                                       gt=self.gt)
+                                       gt=self.gt,
+                                       use_rgb_channels=self.use_rgb_channels)
 
     self.validloader = torch.utils.data.DataLoader(self.valid_dataset,
                                                    batch_size=self.batch_size,
@@ -305,7 +347,8 @@ class Parser():
                                         learning_map_inv=self.learning_map_inv,
                                         sensor=self.sensor,
                                         max_points=max_points,
-                                        gt=False)
+                                        gt=False,
+                                        use_rgb_channels=self.use_rgb_channels)
 
       self.testloader = torch.utils.data.DataLoader(self.test_dataset,
                                                     batch_size=self.batch_size,

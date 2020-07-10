@@ -75,7 +75,8 @@ class Trainer():
                                       batch_size=self.ARCH["train"]["batch_size"],
                                       workers=self.ARCH["train"]["workers"],
                                       gt=True,
-                                      shuffle_train=True)
+                                      shuffle_train=True,
+                                      use_rgb_channels=self.ARCH["backbone"]["input_depth"].get("rgb", False))
 
     # weights for loss (and bias)
     # weights for loss (and bias)
@@ -317,8 +318,16 @@ class Trainer():
     model.train()
 
     end = time.time()
-    for i, (in_vol, proj_mask, proj_labels, _, path_seq, path_name, _, _, _, _, _, _, _, _, _) in enumerate(train_loader):
-        # measure data loading time
+    for i, item in enumerate(train_loader):
+      #(in_vol, proj_mask, proj_labels, _, path_seq, path_name, _, _, _, _, _, _, _, _, _)
+      in_vol = item["proj"]
+      proj_mask = item["proj_mask"]
+      proj_labels = item["proj_labels"]
+      path_seq = item["path_seq"]
+      path_name = item["path_name"]
+      
+      proj_labels = proj_labels.long()
+      # measure data loading time
       data_time.update(time.time() - end)
       if not self.multi_gpu and self.gpu:
         in_vol = in_vol.cuda()
@@ -326,8 +335,8 @@ class Trainer():
       if self.gpu:
         proj_labels = proj_labels.cuda(non_blocking=True).long()
 
-      # compute output
       output = model(in_vol, proj_mask)
+      
       loss = criterion(torch.log(output.clamp(min=1e-8)), proj_labels)
 
       # compute gradient and do SGD step
@@ -416,7 +425,14 @@ class Trainer():
 
     with torch.no_grad():
       end = time.time()
-      for i, (in_vol, proj_mask, proj_labels, _, path_seq, path_name, _, _, _, _, _, _, _, _, _) in enumerate(val_loader):
+      for i, item in enumerate(val_loader):
+        # (in_vol, proj_mask, proj_labels, _, path_seq, path_name, _, _, _, _, _, _, _, _, _)
+        in_vol = item["proj"]
+        proj_mask = item["proj_mask"]
+        proj_labels = item["proj_labels"]
+        path_seq = item["path_seq"]
+        path_name = item["path_name"]
+
         if not self.multi_gpu and self.gpu:
           in_vol = in_vol.cuda()
           proj_mask = proj_mask.cuda()

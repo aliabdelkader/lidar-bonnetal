@@ -7,7 +7,7 @@ class LaserScan:
   """Class that contains LaserScan with x,y,z,r"""
   EXTENSIONS_SCAN = ['.bin', '.npy']
 
-  def __init__(self, project=False, H=64, W=1024, fov_up=3.0, fov_down=-25.0, min_w_angle_degree=0, max_w_angle_degree=180):
+  def __init__(self, project=False, H=64, W=1024, fov_up=3.0, fov_down=-25.0, min_w_angle_degree=0, max_w_angle_degree=180, use_rgb=False):
     self.project = project
     self.proj_H = H
     self.proj_W = W
@@ -15,12 +15,14 @@ class LaserScan:
     self.proj_fov_down = fov_down
     self.min_w_angle_degree = min_w_angle_degree
     self.max_w_angle_degree = max_w_angle_degree
+    self.use_rgb = use_rgb
     self.reset()
 
   def reset(self):
     """ Reset scan members. """
     self.points = np.zeros((0, 3), dtype=np.float32)        # [m, 3]: x, y, z
     self.remissions = np.zeros((0, 1), dtype=np.float32)    # [m ,1]: remission
+    self.rgb = np.zeros((0, 1), dtype=np.float32)    # [m ,1]: rgb
 
     # projected range image - [H,W] range (-1 is no data)
     self.proj_range = np.full((self.proj_H, self.proj_W), -1,
@@ -35,6 +37,10 @@ class LaserScan:
 
     # projected remission - [H,W] intensity (-1 is no data)
     self.proj_remission = np.full((self.proj_H, self.proj_W), -1,
+                                  dtype=np.float32)
+    
+    # projected rgb - [H,W, 3] intensity (-1 is no data)
+    self.proj_rgb = np.full((self.proj_H, self.proj_W, 3), -1,
                                   dtype=np.float32)
 
     # projected index (for each pixel, what I am in the pointcloud)
@@ -83,9 +89,14 @@ class LaserScan:
     # put in attribute
     points = scan[:, 0:3]    # get xyz
     remissions = scan[:, 3]  # get remission
-    self.set_points(points, remissions)
+    # x,y,z,remission,range,r,g,b
+    #0,1,2,3,4,5,6,7
+    rgb = None
+    if self.use_rgb:
+      rgb = scan[:, 5:8]
+    self.set_points(points, remissions, rgb)
 
-  def set_points(self, points, remissions=None):
+  def set_points(self, points, remissions=None, rgb=None):
     """ Set scan attributes (instead of opening from file)
     """
     # reset just in case there was an open structure
@@ -105,6 +116,12 @@ class LaserScan:
       self.remissions = remissions  # get remission
     else:
       self.remissions = np.zeros((points.shape[0]), dtype=np.float32)
+    
+    if (rgb is not None) and (self.use_rgb):
+      self.rgb = rgb
+      assert self.rgb.shape[1] == 3, f"invalid number of rgb channels, expected 3, obtained {self.rgb.shape[1]}"
+    else:
+      self.rgb = np.zeros((points.shape[0], 3), dtype=np.float32)
 
     # if projection is wanted, then do it and fill in the structure
     if self.project:
@@ -166,20 +183,25 @@ class LaserScan:
     proj_y = proj_y[order]
     proj_x = proj_x[order]
 
+    if self.use_rgb:
+      rgb = self.rgb[order]
+
     # assing to images
     self.proj_range[proj_y, proj_x] = depth
     self.proj_xyz[proj_y, proj_x] = points
     self.proj_remission[proj_y, proj_x] = remission
     self.proj_idx[proj_y, proj_x] = indices
     self.proj_mask = (self.proj_idx > 0).astype(np.int32)
+    if self.use_rgb:
+      self.proj_rgb[proj_y, proj_x] = rgb
 
 
 class SemLaserScan(LaserScan):
   """Class that contains LaserScan with x,y,z,r,sem_label,sem_color_label,inst_label,inst_color_label"""
   EXTENSIONS_LABEL = ['.label', '.npy']
 
-  def __init__(self,  sem_color_dict=None, project=False, H=64, W=1024, fov_up=3.0, fov_down=-25.0, max_classes=300, min_w_angle_degree=0, max_w_angle_degree=180):
-    super(SemLaserScan, self).__init__(project, H, W, fov_up, fov_down, min_w_angle_degree=min_w_angle_degree, max_w_angle_degree=max_w_angle_degree)
+  def __init__(self,  sem_color_dict=None, project=False, H=64, W=1024, fov_up=3.0, fov_down=-25.0, max_classes=300, min_w_angle_degree=0, max_w_angle_degree=180, use_rgb=False):
+    super(SemLaserScan, self).__init__(project, H, W, fov_up, fov_down, min_w_angle_degree=min_w_angle_degree, max_w_angle_degree=max_w_angle_degree, use_rgb=use_rgb)
     self.reset()
 
     # make semantic colors
