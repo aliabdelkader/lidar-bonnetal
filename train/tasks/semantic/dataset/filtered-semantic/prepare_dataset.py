@@ -302,7 +302,7 @@ def is_label(filename):
 
 
 if __name__== "__main__":
-    parser = argparse.ArgumentParser("./normalization.py")
+    parser = argparse.ArgumentParser("./prepare_dataset.py")
     parser.add_argument(
         '--dataset', '-d',
         type=str,
@@ -323,14 +323,8 @@ if __name__== "__main__":
         help='Architecture yaml cfg file. See /config/arch for sample. No default!',
     )
     parser.add_argument(
-        '--save_proj',
-        type=str,
-        required=False,
-        help='should save projected points',
-    )
-    parser.add_argument(
         '--save_filtered_scan',
-        type=bool,
+        type=int,
         required=False,
         default=False,
         help='should save scan after filtering by image fov',
@@ -386,7 +380,7 @@ if __name__== "__main__":
 
     root = os.path.join(FLAGS.dataset, "sequences")
     print(FLAGS)
-    if FLAGS.save_filtered_dir:
+    if FLAGS.save_filtered_dir and FLAGS.save_filtered_scan:
       save_root = os.path.join(FLAGS.save_filtered_dir, "sequences")
       if not os.path.isdir(save_root):
         os.makedirs(save_root, exist_ok=True)
@@ -403,7 +397,7 @@ if __name__== "__main__":
     sequences.extend(test_sequences.copy())
     
     include_sets = FLAGS.include_sets.split(",")
-    print(f"sets included {include_sets}")
+    
     include_seq_in_stats = []
     if "train" in include_sets:
       include_seq_in_stats.extend(train_sequences.copy())
@@ -411,7 +405,7 @@ if __name__== "__main__":
       include_seq_in_stats.extend(valid_sequences.copy())
     if "test" in include_sets:
       include_seq_in_stats.extend(test_sequences.copy())
-
+    print(f"seq included {include_seq_in_stats}")
     sensor = ARCH["dataset"]["sensor"]
     sensor_img_H = sensor["img_prop"]["height"]
     sensor_img_W = sensor["img_prop"]["width"]
@@ -564,6 +558,7 @@ if __name__== "__main__":
           if int(seq) in include_seq_in_stats:
             proj = get_pgm(scan)
             all_pgms.append(proj)
+
     
     if len(all_pgms) > 0:
       stacked_pgms = torch.stack(all_pgms)

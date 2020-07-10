@@ -50,7 +50,7 @@ if __name__ == '__main__':
   )
   parser.add_argument(
       '--use_cross_validation',
-      type=bool,
+      type=int,
       required=False,
       default=None,
       help='Use cross validation'
@@ -124,7 +124,7 @@ if __name__ == '__main__':
     print(e)
     print("Error copying files, check permissions. Exiting...")
     quit()
-  
+  print(FLAGS.use_cross_validation)
   if FLAGS.use_cross_validation:
     trainer = CVTrainer(ARCH, DATA, FLAGS.dataset, FLAGS.log, path=FLAGS.pretrained, num_cross_folds=FLAGS.num_cross_folds)
   else:
