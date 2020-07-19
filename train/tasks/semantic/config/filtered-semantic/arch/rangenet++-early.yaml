@@ -1,15 +1,16 @@
+# based on darknet-512px
 ################################################################################
 # training parameters
 ################################################################################
 train:
   loss: "xentropy"       # must be either xentropy or iou
   max_epochs: 100
-  lr: 0.001              # sgd learning rate
-  wup_epochs: 0.01       # warmup during first XX epochs (can be float)
+  lr: 0.01               # sgd learning rate
+  wup_epochs: 0.01          # warmup during first XX epochs (can be float)
   momentum: 0.9          # sgd momentum
   lr_decay: 0.99         # learning rate decay per epoch after initial cycle (from min lr)
   w_decay: 0.0001        # weight decay
-  batch_size: 16          # batch size
+  batch_size: 16         # batch size
   report_batch: 5        # every x batches, report loss
   report_epoch: 2        # every x epochs, report validation set
   epsilon_w: 0.001       # class weight w = 1 / (content + epsilon_w)
@@ -26,24 +27,25 @@ train:
 # backbone parameters
 ################################################################################
 backbone:
-  name: "squeezesegV2"  # ['squeezeseg', 'squeezesegV2', 'darknet']
+  name: "darknet"  # ['squeezeseg', 'squeezesegV2', 'darknet']
   input_depth:
     range: True
     xyz: True
     remission: True
     rgb: True
-  dropout: 0.01
-  OS: 16 # output stride (only horizontally)
+  dropout: 0.05
   bn_d: 0.01
+  OS: 32 # output stride (only horizontally)
   train: True # train backbone?
-  extra: False
+  extra:
+    layers: 53
 
 ################################################################################
 # decoder parameters
 ################################################################################
 decoder:
-  name: "squeezesegV2"
-  dropout: 0.01
+  name: "darknet"
+  dropout: 0.05
   bn_d: 0.01
   train: True # train decoder?
   extra: False # nothing to add for this decoder, otherwise this is a dict
@@ -54,24 +56,18 @@ decoder:
 head:
   name: "segmentation"
   train: True
-  dropout: 0.01
+  dropout: 0.05
 
 ################################################################################
 # postproc parameters
 ################################################################################
 post:
   CRF: 
-    use: True
-    train: True
-    params:
-      iter: 3
-      lcn_size:
-        h: 3
-        w: 5
-      xyz_coef: 0.1
-      xyz_sigma: 0.7
-  KNN:
     use: False
+    train: True
+    params: False # this should be a dict when in use
+  KNN:
+    use: True
     params:
       knn: 5
       search: 5
@@ -90,7 +86,7 @@ dataset:
     name: "HDL64"
     type: "spherical" # projective
     fov_up: 3
-    fov_down: -18
+    fov_down: -18 #-25 
     min_w_angle_degree: -40
     max_w_angle_degree: 40
     img_prop:
@@ -114,4 +110,3 @@ dataset:
       - 73.21901702880859375
       - 72.65906524658203125
       - 70.94754028320312500
-    
