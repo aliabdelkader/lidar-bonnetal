@@ -35,6 +35,13 @@ if __name__ == '__main__':
       default=None,
       help='Directory to get the trained model.'
   )
+  parser.add_argument(
+      '--splits',
+      type=str,
+      required=True,
+      default=None,
+      help='splits to infer'
+  )
   FLAGS, unparsed = parser.parse_known_args()
 
   # print summary of what we will do
@@ -65,28 +72,33 @@ if __name__ == '__main__':
     print(e)
     print("Error opening data yaml file.")
     quit()
-
+  
+  splits = FLAGS.splits.split(',')
+  print(splits)
   # create log folder
   try:
     if os.path.isdir(FLAGS.log):
       shutil.rmtree(FLAGS.log)
     os.makedirs(FLAGS.log)
     os.makedirs(os.path.join(FLAGS.log, "sequences"))
-    for seq in DATA["split"]["train"]:
-      seq = '{0:02d}'.format(int(seq))
-      print("train", seq)
-      os.makedirs(os.path.join(FLAGS.log, "sequences", seq))
-      os.makedirs(os.path.join(FLAGS.log, "sequences", seq, "predictions"))
-    for seq in DATA["split"]["valid"]:
-      seq = '{0:02d}'.format(int(seq))
-      print("valid", seq)
-      os.makedirs(os.path.join(FLAGS.log, "sequences", seq))
-      os.makedirs(os.path.join(FLAGS.log, "sequences", seq, "predictions"))
-    for seq in DATA["split"]["test"]:
-      seq = '{0:02d}'.format(int(seq))
-      print("test", seq)
-      os.makedirs(os.path.join(FLAGS.log, "sequences", seq))
-      os.makedirs(os.path.join(FLAGS.log, "sequences", seq, "predictions"))
+    if "train" in splits:
+      for seq in DATA["split"]["train"]:
+        seq = '{0:02d}'.format(int(seq))
+        print("train", seq)
+        os.makedirs(os.path.join(FLAGS.log, "sequences", seq))
+        os.makedirs(os.path.join(FLAGS.log, "sequences", seq, "predictions"))
+    if "valid" in splits:
+      for seq in DATA["split"]["valid"]:
+        seq = '{0:02d}'.format(int(seq))
+        print("valid", seq)
+        os.makedirs(os.path.join(FLAGS.log, "sequences", seq))
+        os.makedirs(os.path.join(FLAGS.log, "sequences", seq, "predictions"))
+    if "test" in splits:
+      for seq in DATA["split"]["test"]:
+        seq = '{0:02d}'.format(int(seq))
+        print("test", seq)
+        os.makedirs(os.path.join(FLAGS.log, "sequences", seq))
+        os.makedirs(os.path.join(FLAGS.log, "sequences", seq, "predictions"))
   except Exception as e:
     print(e)
     print("Error creating log directory. Check permissions!")
@@ -106,4 +118,4 @@ if __name__ == '__main__':
 
   # create user and infer dataset
   user = User(ARCH, DATA, FLAGS.dataset, FLAGS.log, FLAGS.model)
-  user.infer()
+  user.infer(splits=splits)

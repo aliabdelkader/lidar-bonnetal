@@ -8,7 +8,7 @@ import sys
 import numpy as np
 import torch
 import __init__ as booger
-
+from tqdm import tqdm
 from tasks.semantic.modules.ioueval import iouEval
 from common.laserscan import SemLaserScan
 
@@ -130,7 +130,7 @@ if __name__ == '__main__':
                               str(sequence), "velodyne")
     # populate the scan names
     seq_scan_names = [os.path.join(dp, f) for dp, dn, fn in os.walk(
-        os.path.expanduser(scan_paths)) for f in fn if ".bin" in f]
+        os.path.expanduser(scan_paths)) for f in fn if ".bin" or ".npy" in f]
     seq_scan_names.sort()
     scan_names.extend(seq_scan_names)
   # print(scan_names)
@@ -143,7 +143,7 @@ if __name__ == '__main__':
                                str(sequence), "labels")
     # populate the label names
     seq_label_names = [os.path.join(dp, f) for dp, dn, fn in os.walk(
-        os.path.expanduser(label_paths)) for f in fn if ".label" in f]
+        os.path.expanduser(label_paths)) for f in fn if ".label" or ".npy" in f]
     seq_label_names.sort()
     label_names.extend(seq_label_names)
   # print(label_names)
@@ -156,7 +156,7 @@ if __name__ == '__main__':
                               sequence, "predictions")
     # populate the label names
     seq_pred_names = [os.path.join(dp, f) for dp, dn, fn in os.walk(
-        os.path.expanduser(pred_paths)) for f in fn if ".label" in f]
+        os.path.expanduser(pred_paths)) for f in fn if ".label" or ".npy" in f]
     seq_pred_names.sort()
     pred_names.extend(seq_pred_names)
   # print(pred_names)
@@ -164,13 +164,14 @@ if __name__ == '__main__':
   # check that I have the same number of files
   # print("labels: ", len(label_names))
   # print("predictions: ", len(pred_names))
+  print(len(scan_names), len(label_names), len(pred_names))
   assert(len(label_names) == len(scan_names) and
          len(label_names) == len(pred_names))
 
   print("Evaluating sequences: ")
   # open each file, get the tensor, and make the iou comparison
-  for scan_file, label_file, pred_file in zip(scan_names, label_names, pred_names):
-    print("evaluating label ", label_file, "with", pred_file)
+  for scan_file, label_file, pred_file in tqdm(zip(scan_names, label_names, pred_names), total=len(pred_names)):
+    # print("evaluating label ", label_file, "with", pred_file)
     # open label
     label = SemLaserScan(project=False)
     label.open_scan(scan_file)

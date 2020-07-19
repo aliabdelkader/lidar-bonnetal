@@ -47,7 +47,8 @@ class User():
                                       batch_size=1,
                                       workers=self.ARCH["train"]["workers"],
                                       gt=True,
-                                      shuffle_train=False)
+                                      shuffle_train=False,
+                                      use_rgb_channels=self.ARCH["backbone"]["input_depth"].get("rgb", False))
 
     # concatenate the encoder and the head
     with torch.no_grad():
@@ -64,6 +65,7 @@ class User():
     # GPU?
     self.gpu = False
     self.model_single = self.model
+    print(self.model_single)
     self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Infering in device: ", self.device)
     if torch.cuda.is_available() and torch.cuda.device_count() > 0:
@@ -72,16 +74,18 @@ class User():
       self.gpu = True
       self.model.cuda()
 
-  def infer(self):
+  def infer(self, splits=["test"]):
     # do train set
-    self.infer_subset(loader=self.parser.get_train_set(),
+    if "train" in splits:
+      self.infer_subset(loader=self.parser.get_train_set(),
                       to_orig_fn=self.parser.to_original)
-
-    # do valid set
-    self.infer_subset(loader=self.parser.get_valid_set(),
+    if "valid" in splits:
+      # do valid set
+      self.infer_subset(loader=self.parser.get_valid_set(),
                       to_orig_fn=self.parser.to_original)
-    # do test set
-    self.infer_subset(loader=self.parser.get_test_set(),
+    if "test" in splits:
+      # do test set
+      self.infer_subset(loader=self.parser.get_test_set(),
                       to_orig_fn=self.parser.to_original)
 
     print('Finished Infering')
@@ -99,7 +103,17 @@ class User():
     with torch.no_grad():
       end = time.time()
 
-      for i, (proj_in, proj_mask, _, _, path_seq, path_name, p_x, p_y, proj_range, unproj_range, _, _, _, _, npoints) in enumerate(loader):
+      for i, item in enumerate(loader):
+        # (proj_in, proj_mask, _, _, path_seq, path_name, p_x, p_y, proj_range, unproj_range, _, _, _, _, npoints)
+        proj_in = item['proj']
+        proj_mask = item['proj_mask']
+        path_seq = item['path_seq']
+        path_name = item['path_name']
+        p_x = item['proj_x']
+        p_y = item['proj_y']
+        proj_range = item['proj_range']
+        unproj_range = item['unproj_range']
+        npoints = item['unproj_n_points']
         # first cut to rela size (batch size one allows it)
         p_x = p_x[0, :npoints]
         p_y = p_y[0, :npoints]
@@ -151,4 +165,5 @@ class User():
         # save scan
         path = os.path.join(self.logdir, "sequences",
                             path_seq, "predictions", path_name)
-        pred_np.tofile(path)
+        np.save(path, pred_np)
+        # pred_np.tofile(path)
