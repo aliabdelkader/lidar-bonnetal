@@ -24,16 +24,29 @@ class Segmentator(nn.Module):
                                   self.ARCH["backbone"]["name"] + '.py')
     self.backbone = bboneModule.Backbone(params=self.ARCH["backbone"])
 
+    self.use_camera_image = self.ARCH["backbone"].get("camera_image", False)
     # do a pass of the backbone to initialize the skip connections
     stub = torch.zeros((1,
                         self.backbone.get_input_depth(),
                         self.ARCH["dataset"]["sensor"]["img_prop"]["height"],
                         self.ARCH["dataset"]["sensor"]["img_prop"]["width"]))
+    if self.use_camera_image:
+      stub_image = torch.zeros((1, 
+                                3, 
+                                self.ARCH["dataset"]["sensor"].get("camera_image_height", None),
+                                self.ARCH["dataset"]["sensor"].get("camera_image_width", None)))
 
     if torch.cuda.is_available():
       stub = stub.cuda()
+      if self.use_camera_image:
+        stub_image = stub_image.cuda()
+
       self.backbone.cuda()
-    _, stub_skips = self.backbone(stub)
+    
+    if self.use_camera_image:
+      _, stub_skips = self.backbone(stub, stub_image)
+    else:
+      _, stub_skips = self.backbone(stub)
 
     decoderModule = imp.load_source("decoderModule",
                                     booger.TRAIN_PATH + '/tasks/semantic/decoders/' +
@@ -146,7 +159,13 @@ class Segmentator(nn.Module):
       print("No path to pretrained, using random init.")
 
   def forward(self, x, mask=None):
-    y, skips = self.backbone(x)
+    if self.use_camera_image:
+      assert isinstance(x, list) and len(x) == 2, "invalid input to segmentator, expecting list with LiDAR PGM and image"
+      x, camera = x
+      y, skips = self.backbone(x, camera)
+    else:
+      y, skips = self.backbone(x)  
+    
     y = self.decoder(y, skips)
     y = self.head(y)
     y = F.softmax(y, dim=1)

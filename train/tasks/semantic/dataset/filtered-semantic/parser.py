@@ -3,10 +3,11 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 from common.laserscan import LaserScan, SemLaserScan
+from common.ImageReader import ImageReader
 
 EXTENSIONS_SCAN = ['.bin', '.npy']
 EXTENSIONS_LABEL = ['.label', '.npy']
-
+EXTENSIONS_IMAGE = ['.png']
 
 def is_scan(filename):
   return any(filename.endswith(ext) for ext in EXTENSIONS_SCAN)
@@ -14,6 +15,9 @@ def is_scan(filename):
 
 def is_label(filename):
   return any(filename.endswith(ext) for ext in EXTENSIONS_LABEL)
+
+def is_image(filename):
+  return any(filename.endswith(ext) for ext in EXTENSIONS_IMAGE)
 
 
 class SemanticKitti(Dataset):
@@ -27,7 +31,8 @@ class SemanticKitti(Dataset):
                sensor,              # sensor to parse scans from
                max_points=150000,   # max number of points present in dataset
                gt=True,           # send ground truth?
-               use_rgb_channels=False):
+               use_rgb_channels=False, # use rgb channels in PGM
+               use_camera_image=False): # use rgb camera image
     # save deats
     self.root = os.path.join(root, "sequences")
     self.sequences = sequences
@@ -49,6 +54,17 @@ class SemanticKitti(Dataset):
     self.max_points = max_points
     self.gt = gt
     self.use_rgb_channels = use_rgb_channels
+    self.use_camera_image = use_camera_image
+    self.image_reader = None
+
+    if self.use_camera_image:
+      self.camera_image_height = sensor.get("camera_image_height", None)
+      self.camera_image_width = sensor.get("camera_image_width", None)
+
+      assert self.camera_image_height is not None, "configuration error: expected camera image height value"
+      assert self.camera_image_width is not None, "configuration error: expected camera image width value"
+      self.image_reader = ImageReader(resize_width=self.camera_image_width, resize_height=self.camera_image_height)
+
 
     # get number of classes (can't be len(self.learning_map) because there
     # are multiple repeated entries, so the number that matters is how many
@@ -78,6 +94,9 @@ class SemanticKitti(Dataset):
     # placeholder for filenames
     self.scan_files = []
     self.label_files = []
+    self.image_files = None
+    if self.use_camera_image:
+      self.image_files = []
 
     # fill in with names, checking that all sequences are complete
     for seq in self.sequences:
@@ -89,12 +108,16 @@ class SemanticKitti(Dataset):
       # get paths for each
       scan_path = os.path.join(self.root, seq, "velodyne")
       label_path = os.path.join(self.root, seq, "labels")
-
+      
       # get files
       scan_files = [os.path.join(dp, f) for dp, dn, fn in os.walk(
           os.path.expanduser(scan_path)) for f in fn if is_scan(f)]
       label_files = [os.path.join(dp, f) for dp, dn, fn in os.walk(
           os.path.expanduser(label_path)) for f in fn if is_label(f)]
+      if self.use_camera_image:
+        image_path = os.path.join(self.root, seq, "image_2")
+        image_files = [os.path.join(dp, f) for dp, dn, fn in os.walk(
+          os.path.expanduser(image_path)) for f in fn if is_image(f)]
 
       # check all scans have labels
       if self.gt:
@@ -104,9 +127,14 @@ class SemanticKitti(Dataset):
       self.scan_files.extend(scan_files)
       self.label_files.extend(label_files)
 
+      if self.use_camera_image:
+        self.image_files.extend(image_files)
     # sort for correspondance
     self.scan_files.sort()
     self.label_files.sort()
+
+    if self.use_camera_image:
+      self.image_files.sort()
 
     print("Using {} scans from sequences {}".format(len(self.scan_files),
                                                     self.sequences))
@@ -114,6 +142,9 @@ class SemanticKitti(Dataset):
   def __getitem__(self, index):
     # get item in tensor shape
     scan_file = self.scan_files[index]
+
+   
+
     if self.gt:
       label_file = self.label_files[index]
     
@@ -137,6 +168,7 @@ class SemanticKitti(Dataset):
                        min_w_angle_degree=self.sensor_min_w_angle_degree,
                        max_w_angle_degree=self.sensor_max_w_angle_degree,
                        use_rgb=self.use_rgb_channels)
+      
 
     # open and obtain scan
     scan.open_scan(scan_file)
@@ -164,6 +196,12 @@ class SemanticKitti(Dataset):
     else:
       unproj_labels = []
 
+    camera_image_torch = None
+    if self.use_camera_image:
+      image_file = self.image_files[index]
+      camera_image = self.image_reader.open_image(image_file)
+      camera_image_torch =  torch.from_numpy(camera_image).float()
+      camera_image_torch = camera_image_torch.clone().permute(2, 0, 1)
     # get points and labels
     proj_range = torch.from_numpy(scan.proj_range).clone()
     proj_xyz = torch.from_numpy(scan.proj_xyz).clone()
@@ -224,6 +262,9 @@ class SemanticKitti(Dataset):
     if self.use_rgb_channels:
       item['proj_rgb'] = proj_rgb
       item['unproj_rgb'] = unproj_rgb
+    
+    if self.use_camera_image:
+      item['camera_image'] = camera_image_torch
 
     return item
 
@@ -274,7 +315,8 @@ class Parser():
                workers,           # threads to load data
                gt=True,           # get gt?
                shuffle_train=True,  # shuffle training set?
-               use_rgb_channels=False):
+               use_rgb_channels=False, # use rgb channels in pgm
+               use_camera_image=False): # use image from rgb camera
     super(Parser, self).__init__()
 
     # if I am training, get the dataset
@@ -293,7 +335,7 @@ class Parser():
     self.gt = gt
     self.shuffle_train = shuffle_train
     self.use_rgb_channels = use_rgb_channels
-
+    self.use_camera_image = use_camera_image
     # number of classes that matters is the one for xentropy
     self.nclasses = len(self.learning_map_inv)
 
@@ -307,7 +349,8 @@ class Parser():
                                        sensor=self.sensor,
                                        max_points=max_points,
                                        gt=self.gt,
-                                       use_rgb_channels=self.use_rgb_channels)
+                                       use_rgb_channels=self.use_rgb_channels,
+                                       use_camera_image=self.use_camera_image)
 
     self.trainloader = torch.utils.data.DataLoader(self.train_dataset,
                                                    batch_size=self.batch_size,
@@ -327,7 +370,8 @@ class Parser():
                                        sensor=self.sensor,
                                        max_points=max_points,
                                        gt=self.gt,
-                                       use_rgb_channels=self.use_rgb_channels)
+                                       use_rgb_channels=self.use_rgb_channels,
+                                       use_camera_image=self.use_camera_image)
 
     self.validloader = torch.utils.data.DataLoader(self.valid_dataset,
                                                    batch_size=self.batch_size,
@@ -348,7 +392,8 @@ class Parser():
                                         sensor=self.sensor,
                                         max_points=max_points,
                                         gt=False,
-                                        use_rgb_channels=self.use_rgb_channels)
+                                        use_rgb_channels=self.use_rgb_channels,
+                                        use_camera_image=self.use_camera_image)
 
       self.testloader = torch.utils.data.DataLoader(self.test_dataset,
                                                     batch_size=self.batch_size,

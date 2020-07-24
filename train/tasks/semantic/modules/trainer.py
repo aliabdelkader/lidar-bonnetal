@@ -57,7 +57,7 @@ class Trainer():
                  "decoder_lr": 0,
                  "head_lr": 0,
                  "post_lr": 0}
-
+    self.use_camera_image = self.ARCH["backbone"].get("camera_image", False)
     # get the data
     parserModule = imp.load_source("parserModule",
                                    booger.TRAIN_PATH + '/tasks/semantic/dataset/' +
@@ -76,7 +76,8 @@ class Trainer():
                                       workers=self.ARCH["train"]["workers"],
                                       gt=True,
                                       shuffle_train=True,
-                                      use_rgb_channels=self.ARCH["backbone"]["input_depth"].get("rgb", False))
+                                      use_rgb_channels=self.ARCH["backbone"]["input_depth"].get("rgb", False),
+                                      use_camera_image=self.use_camera_image)
 
     # weights for loss (and bias)
     # weights for loss (and bias)
@@ -327,6 +328,9 @@ class Trainer():
       path_name = item["path_name"]
       
       proj_labels = proj_labels.long()
+
+      if self.use_camera_image:
+        camera_image = item["camera_image"]
       # measure data loading time
       data_time.update(time.time() - end)
       if not self.multi_gpu and self.gpu:
@@ -335,7 +339,13 @@ class Trainer():
       if self.gpu:
         proj_labels = proj_labels.cuda(non_blocking=True).long()
 
-      output = model(in_vol, proj_mask)
+        if self.use_camera_image:
+          camera_image = camera_image.cuda()
+      
+      if self.use_camera_image:
+        output = model([in_vol, camera_image], proj_mask)
+      else:
+        output = model(in_vol, proj_mask)
       
       loss = criterion(torch.log(output.clamp(min=1e-8)), proj_labels)
 
@@ -432,6 +442,8 @@ class Trainer():
         proj_labels = item["proj_labels"]
         path_seq = item["path_seq"]
         path_name = item["path_name"]
+        if self.use_camera_image:
+          camera_image = item["camera_image"]
 
         if not self.multi_gpu and self.gpu:
           in_vol = in_vol.cuda()
@@ -439,8 +451,15 @@ class Trainer():
         if self.gpu:
           proj_labels = proj_labels.cuda(non_blocking=True).long()
 
+          if self.use_camera_image:
+            camera_image = camera_image.cuda()
+
         # compute output
-        output = model(in_vol, proj_mask)
+        if self.use_camera_image:
+          output = model([in_vol, camera_image], proj_mask)
+        else:
+          output = model(in_vol, proj_mask)
+      
         loss = criterion(torch.log(output.clamp(min=1e-8)), proj_labels)
 
         # measure accuracy and record loss
