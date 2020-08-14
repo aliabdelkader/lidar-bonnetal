@@ -1,0 +1,114 @@
+################################################################################
+# training parameters
+################################################################################
+train:
+  loss: "xentropy"       # must be either xentropy or iou
+  max_epochs: 100
+  lr: 0.001              # sgd learning rate
+  wup_epochs: 0.01       # warmup during first XX epochs (can be float)
+  momentum: 0.9          # sgd momentum
+  lr_decay: 0.99         # learning rate decay per epoch after initial cycle (from min lr)
+  w_decay: 0.0001        # weight decay
+  batch_size: 16          # batch size
+  report_batch: 5        # every x batches, report loss
+  report_epoch: 2        # every x epochs, report validation set
+  epsilon_w: 0.001       # class weight w = 1 / (content + epsilon_w)
+  save_summary: False    # Summary of weight histograms for tensorboard
+  save_scans: True       # False doesn't save anything, True saves some 
+                         # sample images (one per batch of the last calculated batch)
+                         # in log folder
+  show_scans: False      # show scans during training
+  workers: 4            # number of threads to get data
+  initialize_seed: True # initialize random number generators
+  seed: 90
+
+################################################################################
+# backbone parameters
+################################################################################
+backbone:
+  name: "squeezesegV2_STN"  # ['squeezeseg', 'squeezesegV2', 'darknet']
+  input_depth:
+    range: True
+    xyz: True
+    remission: True
+    rgb: False
+  camera_image: True
+  dropout: 0.01
+  OS: 16 # output stride (only horizontally)
+  bn_d: 0.01
+  train: True # train backbone?
+  extra: False
+
+################################################################################
+# decoder parameters
+################################################################################
+decoder:
+  name: "squeezesegV2"
+  dropout: 0.01
+  bn_d: 0.01
+  train: True # train decoder?
+  extra: False # nothing to add for this decoder, otherwise this is a dict
+
+################################################################################
+# classification head parameters
+################################################################################
+head:
+  name: "segmentation"
+  train: True
+  dropout: 0.01
+
+################################################################################
+# postproc parameters
+################################################################################
+post:
+  CRF: 
+    use: True
+    train: True
+    params:
+      iter: 3
+      lcn_size:
+        h: 3
+        w: 5
+      xyz_coef: 0.1
+      xyz_sigma: 0.7
+  KNN:
+    use: False
+    params:
+      knn: 5
+      search: 5
+      sigma: 1.0 
+      cutoff: 1.0
+
+################################################################################
+# classification head parameters
+################################################################################
+# dataset (to find parser)
+dataset:
+  labels: "kitti"
+  scans: "kitti"
+  max_points: 150000 # max of any scan in dataset
+  sensor:
+    name: "HDL64"
+    type: "spherical" # projective
+    fov_up: 3
+    fov_down: -18
+    min_w_angle_degree: -40
+    max_w_angle_degree: 40
+    camera_image_width: 1220
+    camera_image_height: 370
+    img_prop:
+      width: 512
+      height: 64
+    img_means: #range,x,y,z,signal
+      - 8.763322830200195312
+      - 8.151197433471679688
+      - 0.1591566503047943115
+      - -0.5131324529647827148
+      - 0.1540666222572326660
+    img_stds: #range,x,y,z,signal
+      - 11.51991081237792969
+      - 10.98492145538330078
+      - 4.635982036590576172
+      - 0.7824990153312683105
+      - 0.1757677197456359863
+    
