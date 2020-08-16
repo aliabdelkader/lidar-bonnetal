@@ -118,21 +118,21 @@ learning_map:
   18: 4     # "truck"
   20: 5     # "other-vehicle"
   30: 6     # "person"
-  31: 7     # "bicyclist" mapped to "rider" ---------------------mapped
-  32: 7     # "motorcyclist" mapped to "rider" ---------------------mapped
-  40: 9     # "road"
+  31: 7     # "bicyclist" name changed to "rider" --------------------------mapped
+  32: 7     # "motorcyclist" mapped to "rider" --------------------------mapped
+  40: 8     # "road"
   44: 0    # "parking" mapped to "unlabeled" --------------------------mapped
-  48: 11    # "sidewalk"
+  48: 9    # "sidewalk"
   49: 0    # "other-ground" mapped to "unlabeled" --------------------------mapped
-  50: 13    # "building"
-  51: 14    # "fence"
+  50: 10    # "building"
+  51: 11    # "fence"
   52: 0     # "other-structure" mapped to "unlabeled" ------------------mapped
-  60: 9     # "lane-marking" to "road" ---------------------------------mapped
-  70: 15    # "vegetation"
-  71: 15    # "trunk" to "vegetation" ---------------------------------mapped
-  72: 17    # "terrain"
-  80: 18    # "pole"
-  81: 19    # "traffic-sign"
+  60: 8     # "lane-marking" to "road" ---------------------------------mapped
+  70: 12    # "vegetation"
+  71: 12    # "trunk" mapped to "vegetation" --------------------------mapped
+  72: 13    # "terrain"
+  80: 14    # "pole"
+  81: 15    # "traffic-sign"
   99: 0     # "other-object" to "unlabeled" ----------------------------mapped
   252: 1    # "moving-car" to "car" ------------------------------------mapped
   253: 7    # "moving-bicyclist" to "rider" ------------------------mapped
@@ -151,14 +151,14 @@ learning_map_inv: # inverse of previous map
   5: 20     # "other-vehicle"
   6: 30     # "person"
   7: 31     # "rider"
-  9: 40     # "road"
-  11: 48    # "sidewalk"
-  13: 50    # "building"
-  14: 51    # "fence"
-  15: 70    # "vegetation"
-  17: 72    # "terrain"
-  18: 80    # "pole"
-  19: 81    # "traffic-sign"
+  8: 40     # "road"
+  9: 48     # "sidewalk"
+  10: 50    # "building"
+  11: 51    # "fence"
+  12: 70    # "vegetation"
+  13: 72    # "terrain"
+  14: 80    # "pole"
+  15: 81    # "traffic-sign"
 learning_ignore: # Ignore classes
   0: True      # "unlabeled", and others ignored
   1: False     # "car"
