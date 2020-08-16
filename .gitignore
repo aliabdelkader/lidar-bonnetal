@@ -7,5 +7,7 @@
 .vscode
 .catkin_tools/
 devel/
-logs/
+*.png
+**/filtered-semantic-test/
+**/.ipynb_checkpoints/
 external.hpp

@@ -1,0 +1,12 @@
+experiment_name: "SqueezeSegV2-Early-Filtered-Semantic-remapped"
+experiment_version: "v1.0"
+commit_message: "SqeezeSegV2 Early fusion model on with semantic kitti filtered by camera frames and classes remapped"
+working_dir: "/home/mrafaat/AliThesis/lidar-bonnetal/train/tasks/semantic"
+dataset: "/raid/ali/AliThesis/FilteredSemanticKitti/dataset/"
+arch_cfg: "/home/mrafaat/AliThesis/lidar-bonnetal/train/tasks/semantic/config/filtered-semantic/arch/squeezesegV2_crf-early.yaml"
+data_cfg: "/home/mrafaat/AliThesis/lidar-bonnetal/train/tasks/semantic/config/filtered-semantic/labels/filtered-semantic.yaml"
+log: "/home/mrafaat/AliThesis/lidar-bonnetal/train/tasks/semantic/logs/filtered-semantic/squeezesegV2_crf-early"
+use_cross_validation: 0
+num_cross_folds: 0
+cuda: 7
+pretrained: None
