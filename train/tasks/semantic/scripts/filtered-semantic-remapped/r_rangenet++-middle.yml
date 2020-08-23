@@ -1,0 +1,12 @@
+experiment_name: "Rangenet++-Middle-Filtered-Semantic-remapped"
+experiment_version: "v1.0"
+commit_message: "Rangenet++ Middle fusion model on with semantic kitti filtered by camera frames and classes remapped"
+working_dir: "/home/mrafaat/AliThesis/lidar-bonnetal/train/tasks/semantic"
+dataset: "/raid/ali/AliThesis/FilteredSemanticKitti/dataset/"
+arch_cfg: "/home/mrafaat/AliThesis/lidar-bonnetal/train/tasks/semantic/config/filtered-semantic/arch/rangenet++-middle.yaml"
+data_cfg: "/home/mrafaat/AliThesis/lidar-bonnetal/train/tasks/semantic/config/filtered-semantic/labels/filtered-semantic-remapped.yaml"
+log: "/home/mrafaat/AliThesis/lidar-bonnetal/train/tasks/semantic/logs/filtered-semantic-remapped/rangenet++-middle"
+use_cross_validation: 0
+num_cross_folds: 0
+cuda: 6
+pretrained: None
