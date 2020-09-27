@@ -3,7 +3,7 @@
 ################################################################################
 train:
   loss: "xentropy"       # must be either xentropy or iou
-  max_epochs: 200
+  max_epochs: 50
   lr: 0.01              # sgd learning rate
   wup_epochs: 0.99       # warmup during first XX epochs (can be float)
   momentum: 0.0          # sgd momentum

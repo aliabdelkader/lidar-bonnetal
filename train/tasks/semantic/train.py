@@ -11,7 +11,8 @@ import shutil
 import __init__ as booger
 
 from tasks.semantic.modules.trainer import *
-from tasks.semantic.modules.CVtrainer import *
+from tasks.semantic.modules.CVtrainer import CVTrainer
+from tasks.semantic.modules.HPTrainer import HPTrainer
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser("./train.py")
@@ -61,6 +62,27 @@ if __name__ == '__main__':
       required=False,
       default=None,
       help='number of folds to use'
+  )
+  parser.add_argument(
+      '--use_hp_optimization',
+      type=int,
+      required=False,
+      default=None,
+      help='Use hyperparameter optimization'
+  )
+  parser.add_argument(
+      '--num_hp_trials',
+      type=int,
+      required=False,
+      default=None,
+      help='number of trials for hyperparamter optimization'
+  )
+  parser.add_argument(
+      '--hp_experiment_name',
+      type=str,
+      required=False,
+      default=None,
+      help='Name hp optimization study'
   )
   FLAGS, unparsed = parser.parse_known_args()
 
@@ -127,6 +149,8 @@ if __name__ == '__main__':
   print(FLAGS.use_cross_validation)
   if FLAGS.use_cross_validation:
     trainer = CVTrainer(ARCH, DATA, FLAGS.dataset, FLAGS.log, path=FLAGS.pretrained, num_cross_folds=FLAGS.num_cross_folds)
+  elif FLAGS.use_hp_optimization:
+    trainer = HPTrainer(ARCH, DATA, datadir=FLAGS.dataset, logdir=FLAGS.log, study_name=FLAGS.hp_experiment_name, n_trials=int(FLAGS.num_hp_trials), path=FLAGS.pretrained)
   else:
     trainer = Trainer(ARCH, DATA, FLAGS.dataset, FLAGS.log, FLAGS.pretrained)
   trainer.train()

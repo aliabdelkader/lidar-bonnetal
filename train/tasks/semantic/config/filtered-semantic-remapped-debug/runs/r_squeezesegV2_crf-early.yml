@@ -8,5 +8,7 @@ data_cfg: "/home/mrafaat/AliThesis/lidar-bonnetal/train/tasks/semantic/config/fi
 log: "/home/mrafaat/AliThesis/lidar-bonnetal/train/tasks/semantic/logs/filtered-semantic-remapped-debug/squeezesegV2_crf-early"
 use_cross_validation: 0
 num_cross_folds: 0
-cuda: 7
+use_hp_optimization: 1
+num_hp_trials: 3
 pretrained: None
+cuda: 7
