@@ -39,8 +39,8 @@ class LaserScan:
     self.proj_remission = np.full((self.proj_H, self.proj_W), -1,
                                   dtype=np.float32)
     
-    # projected rgb - [H,W, 3] intensity (-1 is no data)
-    self.proj_rgb = np.full((self.proj_H, self.proj_W, 3), -1,
+    # projected rgb - [H,W, 3]  (0 is no data)
+    self.proj_rgb = np.full((self.proj_H, self.proj_W, 3), 0,
                                   dtype=np.float32)
 
     # projected index (for each pixel, what I am in the pointcloud)
@@ -63,7 +63,7 @@ class LaserScan:
   def __len__(self):
     return self.size()
 
-  def open_scan(self, filename):
+  def _open_scan(self, filename):
     """ Open raw scan and fill in attributes
     """
     # reset just in case there was an open structure
@@ -94,9 +94,13 @@ class LaserScan:
     rgb = None
     if self.use_rgb:
       rgb = scan[:, 5:8]
+    return points, remissions, rgb
+
+  def open_scan(self, filename):
+    points, remissions, rgb = self._open_scan(filename=filename)
     self.set_points(points, remissions, rgb)
 
-  def set_points(self, points, remissions=None, rgb=None):
+  def _set_points(self, points, remissions=None, rgb=None):
     """ Set scan attributes (instead of opening from file)
     """
     # reset just in case there was an open structure
@@ -123,9 +127,10 @@ class LaserScan:
     else:
       self.rgb = np.zeros((points.shape[0], 3), dtype=np.float32)
 
-    # if projection is wanted, then do it and fill in the structure
-    if self.project:
-      self.do_range_projection()
+  def set_points(self, points, remissions=None, rgb=None):
+      self._set_points(points=points, remissions=remissions, rgb=rgb)
+      if self.project:
+        self.do_range_projection()
 
   def do_range_projection(self):
     """ Project a pointcloud into a spherical projection image.projection.
@@ -141,7 +146,8 @@ class LaserScan:
     fov = abs(fov_down) + abs(fov_up)  # get field of view total in rad
 
     # get depth of all points
-    depth = np.linalg.norm(self.points, 2, axis=1)
+    depth  = np.linalg.norm(self.points, 2, axis=1)
+    self.depth = depth
 
     # get scan components
     scan_x = self.points[:, 0]
@@ -150,7 +156,7 @@ class LaserScan:
 
     # get angles of all points
     yaw = -np.arctan2(scan_y, scan_x)
-    pitch = np.arcsin(scan_z / depth)
+    pitch = np.arcsin(scan_z / depth )
 
     # get projections in image coords
     proj_x = (yaw - self.min_w_angle) / (self.max_w_angle - self.min_w_angle) # in [0.0, 1.0]
@@ -163,37 +169,37 @@ class LaserScan:
     proj_x = np.floor(proj_x)
     proj_x = np.minimum(self.proj_W - 1, proj_x)
     proj_x = np.maximum(0, proj_x).astype(np.int32)   # in [0,W-1]
-    self.proj_x = np.copy(proj_x)  # store a copy in orig order
+    proj_x = np.copy(proj_x)  # store a copy in orig order
 
     proj_y = np.floor(proj_y)
     proj_y = np.minimum(self.proj_H - 1, proj_y)
     proj_y = np.maximum(0, proj_y).astype(np.int32)   # in [0,H-1]
-    self.proj_y = np.copy(proj_y)  # stope a copy in original order
+    proj_y = np.copy(proj_y)  # stope a copy in original order
 
     # copy of depth in original order
     self.unproj_range = np.copy(depth)
 
     # order in decreasing depth
     indices = np.arange(depth.shape[0])
-    order = np.argsort(depth)[::-1]
-    depth = depth[order]
-    indices = indices[order]
-    points = self.points[order]
-    remission = self.remissions[order]
-    proj_y = proj_y[order]
-    proj_x = proj_x[order]
+    self.order = np.argsort(depth)[::-1]
+    depth  = depth[self.order]
+    indices = indices[self.order]
+    points = self.points[self.order]
+    remission = self.remissions[self.order]
+    self.proj_y = proj_y[self.order]
+    self.proj_x = proj_x[self.order]
 
     if self.use_rgb:
-      rgb = self.rgb[order]
+      self.rgb = self.rgb[self.order]
 
     # assing to images
-    self.proj_range[proj_y, proj_x] = depth
-    self.proj_xyz[proj_y, proj_x] = points
-    self.proj_remission[proj_y, proj_x] = remission
-    self.proj_idx[proj_y, proj_x] = indices
+    self.proj_range[self.proj_y, self.proj_x] = depth 
+    self.proj_xyz[self.proj_y, self.proj_x] = points
+    self.proj_remission[self.proj_y, self.proj_x] = remission
+    self.proj_idx[self.proj_y, self.proj_x] = indices
     self.proj_mask = (self.proj_idx > 0).astype(np.int32)
     if self.use_rgb:
-      self.proj_rgb[proj_y, proj_x] = rgb
+      self.proj_rgb[self.proj_y, self.proj_x] = self.rgb
 
 
 class SemLaserScan(LaserScan):
@@ -255,7 +261,7 @@ class SemLaserScan(LaserScan):
     self.proj_inst_color = np.zeros((self.proj_H, self.proj_W, 3),
                                     dtype=np.float)              # [H,W,3] color
 
-  def open_label(self, filename):
+  def _open_label(self, filename):
     """ Open raw scan and fill in attributes
     """
     # check filename is string
@@ -266,16 +272,20 @@ class SemLaserScan(LaserScan):
     # check extension is a laserscan
     if not any(filename.endswith(ext) for ext in self.EXTENSIONS_LABEL):
       raise RuntimeError("Filename extension is not valid label file.")
-
+    label = None
     if '.npy' in filename:
       label = np.load(filename)
     else:
       # if all goes well, open label
       label = np.fromfile(filename, dtype=np.int32)
       label = label.reshape((-1))
+    return label
 
+  def open_label(self, filename):
+    label = self._open_label(filename=filename)
     # set it
     self.set_label(label)
+    return label
 
   def set_label(self, label):
     """ Set points for label not from file but from np
